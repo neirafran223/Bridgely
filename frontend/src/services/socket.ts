@@ -12,8 +12,9 @@ export function conectarSocket(): Socket {
   }
 
   const token = localStorage.getItem("token");
+  const serverUrl = import.meta.env.VITE_API_URL || "/";
 
-  socket = io("/", {
+  socket = io(serverUrl, {
     auth: { token },
     transports: ["websocket", "polling"],
     reconnection: true,
