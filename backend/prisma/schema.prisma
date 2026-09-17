@@ -1,0 +1,250 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum Rol {
+    cliente
+    developer
+    admin
+}
+
+enum Disponibilidad {
+    full_time
+    part_time
+    por_horas
+}
+
+enum TipoStack {
+    preferido
+    experiencia
+}
+
+enum NivelStack {
+    basico
+    intermedio
+    avanzado
+}
+
+enum EstadoIdea {
+    abierta
+    en_progreso
+    cerrada
+}
+
+enum Dificultad {
+    basica
+    intermedia
+    avanzada
+}
+
+enum TipoOrigenEquipo {
+    preformado
+    armado_en_plataforma
+}
+
+enum EstadoMiembro {
+    invitado
+    aceptado
+    rechazado
+}
+
+enum EstadoPostulacion {
+    pendiente
+    aceptada
+    rechazada
+}
+
+enum EstadoTransaccion {
+    pendiente
+    pagado
+    liberado
+}
+
+model Usuario {
+    id            String   @id @default(uuid())
+    nombre        String
+    email         String   @unique
+    passwordHash  String
+    telefono      String?
+rol           Rol
+    suspendido    Boolean   @default(false)
+    fotoUrl      String?
+    fechaRegistro DateTime @default(now())
+
+    perfilCliente           PerfilCliente?
+    perfilDeveloper         PerfilDeveloper?
+    equiposCreados          Equipo[]
+    mensajesEnviados        Mensaje[]
+    calificacionesHechas    Calificacion[]   @relation("Calificador")
+    calificacionesRecibidas Calificacion[]   @relation("Calificado")
+    notificaciones          Notificacion[]
+}
+
+model PerfilCliente {
+    id        String  @id @default(uuid())
+    usuarioId String  @unique
+    usuario   Usuario @relation(fields: [usuarioId], references: [id])
+    empresa   String?
+
+    ideas Idea[]
+}
+
+model PerfilDeveloper {
+    id                 String          @id @default(uuid())
+    usuarioId          String          @unique
+    usuario            Usuario         @relation(fields: [usuarioId], references: [id])
+    experienciaAnios   Int?
+    disponibilidad     Disponibilidad?
+    tituloProfesional  String?
+    bio                String?
+    portafolioUrl      String?
+    reputacionPromedio Float?          @default(0)
+
+    stacks        DeveloperStack[]
+    equipos       EquipoMiembro[]
+    postulaciones Postulacion[]
+}
+
+model Stack {
+    id     String @id @default(uuid())
+    nombre String @unique
+
+    developers DeveloperStack[]
+}
+
+model DeveloperStack {
+    id          String          @id @default(uuid())
+    developerId String
+    developer   PerfilDeveloper @relation(fields: [developerId], references: [id])
+    stackId     String
+    stack       Stack           @relation(fields: [stackId], references: [id])
+    tipo        TipoStack
+    nivel       NivelStack
+
+    @@unique([developerId, stackId])
+}
+
+model Idea {
+    id                   String        @id @default(uuid())
+    clienteId            String
+    cliente              PerfilCliente @relation(fields: [clienteId], references: [id])
+    titulo               String
+    descripcion          String
+    categoria            String
+    presupuestoPropuesto Float
+    plazoDeseado         String?
+    dificultadSugerida   Dificultad?
+    estado               EstadoIdea    @default(abierta)
+    fechaCreacion        DateTime      @default(now())
+
+    equipos        Equipo[]
+    postulaciones  Postulacion[]
+    conversaciones Conversacion[]
+    transacciones  Transaccion[]
+}
+
+model Equipo {
+    id            String           @id @default(uuid())
+    ideaId        String?
+    idea          Idea?            @relation(fields: [ideaId], references: [id])
+    nombre        String
+    creadoPorId   String
+    creadoPor     Usuario          @relation(fields: [creadoPorId], references: [id])
+    tipoOrigen    TipoOrigenEquipo
+    fechaCreacion DateTime         @default(now())
+
+    miembros      EquipoMiembro[]
+    postulaciones Postulacion[]
+}
+
+model EquipoMiembro {
+    id          String          @id @default(uuid())
+    equipoId    String
+    equipo      Equipo          @relation(fields: [equipoId], references: [id])
+    developerId String
+    developer   PerfilDeveloper @relation(fields: [developerId], references: [id])
+    estado      EstadoMiembro   @default(invitado)
+
+    @@unique([equipoId, developerId])
+}
+
+model Postulacion {
+    id              String            @id @default(uuid())
+    ideaId          String
+    idea            Idea              @relation(fields: [ideaId], references: [id])
+    developerId     String?
+    developer       PerfilDeveloper?  @relation(fields: [developerId], references: [id])
+    equipoId        String?
+    equipo          Equipo?           @relation(fields: [equipoId], references: [id])
+    mensaje         String
+    precioPropuesto Float
+    estado          EstadoPostulacion @default(pendiente)
+    fecha           DateTime          @default(now())
+
+    conversacion Conversacion?
+    transaccion  Transaccion?
+}
+
+model Conversacion {
+    id            String      @id @default(uuid())
+    ideaId        String
+    idea          Idea        @relation(fields: [ideaId], references: [id])
+    postulacionId String      @unique
+    postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+    fechaCreacion DateTime    @default(now())
+
+    mensajes Mensaje[]
+}
+
+model Mensaje {
+    id             String       @id @default(uuid())
+    conversacionId String
+    conversacion   Conversacion @relation(fields: [conversacionId], references: [id])
+    remitenteId    String
+    remitente      Usuario      @relation(fields: [remitenteId], references: [id])
+    contenido      String
+    fechaEnvio     DateTime     @default(now())
+    leido          Boolean      @default(false)
+}
+
+model Transaccion {
+    id                 String            @id @default(uuid())
+    ideaId             String
+    idea               Idea              @relation(fields: [ideaId], references: [id])
+    postulacionId      String            @unique
+    postulacion        Postulacion       @relation(fields: [postulacionId], references: [id])
+    montoAcordado      Float
+    comisionPlataforma Float
+    estado             EstadoTransaccion @default(pendiente)
+    fecha              DateTime          @default(now())
+
+    calificaciones Calificacion[]
+}
+
+model Calificacion {
+    id            String      @id @default(uuid())
+    transaccionId String
+    transaccion   Transaccion @relation(fields: [transaccionId], references: [id])
+    calificadorId String
+    calificador   Usuario     @relation("Calificador", fields: [calificadorId], references: [id])
+    calificadoId  String
+    calificado    Usuario     @relation("Calificado", fields: [calificadoId], references: [id])
+    puntaje       Int
+    comentario    String?
+    fecha         DateTime    @default(now())
+}
+
+model Notificacion {
+    id        String   @id @default(uuid())
+    usuarioId String
+    usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+    tipo      String
+    contenido String
+    leido     Boolean  @default(false)
+    fecha     DateTime @default(now())
+}
